@@ -201,6 +201,99 @@ Respuesta (200):
 }
 ```
 
+#### Consultar presupuesto o venta de un envío
+`GET /api/shipments/<shipment_id>/sale`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Respuesta (200):
+```json
+{
+  "sale_order_id": 2,
+  "sale_order_name": "S00002",
+  "state": "draft",
+  "partner_id": 9,
+  "partner_name": "Pepe",
+  "amount_untaxed": 25.50,
+  "amount_tax": 5.35,
+  "amount_total": 30.85,
+  "shipment_id": 1,
+  "shipment_name": "SHP-A1B2C3D4",
+  "shipment_tracking_code": "E5F6G7H8I9J0",
+  "product_id": 1,
+  "product_name": "Servicio de Envío",
+  "quantity": 1.0,
+  "price_unit": 25.50,
+  "date_order": "2026-10-29 18:00:00"
+}
+```
+
+#### Confirmar presupuesto de un envío
+`POST /api/shipments/<shipment_id>/sale/confirm`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Respuesta (200):
+```json
+{
+  "message": "Quotation confirmed successfully",
+  "sale_order_id": 2,
+  "sale_order_name": "S00002",
+  "state": "sale",
+  "partner_id": 9,
+  "partner_name": "Pepe",
+  "amount_total": 30.85
+}
+```
+
+---
+
+### Facturas
+
+#### Listar mis facturas
+`GET /api/invoices/me`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Respuesta (200):
+```json
+[
+  {
+    "id": 5,
+    "name": "INV/2026/00001",
+    "move_type": "out_invoice",
+    "state": "posted",
+    "payment_state": "not_paid",
+    "invoice_date": "2026-10-29",
+    "invoice_date_due": "2026-11-29",
+    "partner_id": 9,
+    "partner_name": "Pepe",
+    "amount_untaxed": 25.50,
+    "amount_tax": 5.35,
+    "amount_total": 30.85,
+    "currency": "EUR"
+  }
+]
+```
+
+#### Listar facturas de una persona
+`GET /api/invoices/person/<partner_id>`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+*(Requiere ser el propio usuario o administrador).*
+
 ---
 
 ### Tickets

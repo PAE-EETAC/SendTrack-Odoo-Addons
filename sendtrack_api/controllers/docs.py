@@ -161,6 +161,74 @@ class DocsApiController(http.Controller):
                         }
                     }
                 },
+                "/api/shipments/{shipment_id}/sale": {
+                    "get": {
+                        "summary": "Consultar presupuesto o venta asociada a un envio",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Detalles del presupuesto o venta"},
+                            "403": {"description": "No autorizado para ver este presupuesto"},
+                            "404": {"description": "Envio o presupuesto no encontrado"}
+                        }
+                    }
+                },
+                "/api/shipments/{shipment_id}/sale/confirm": {
+                    "post": {
+                        "summary": "Confirmar presupuesto asociado a un envio",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Presupuesto confirmado exitosamente"},
+                            "400": {"description": "Estado invalido para confirmacion"},
+                            "403": {"description": "No autorizado para confirmar este presupuesto"},
+                            "404": {"description": "Envio o presupuesto no encontrado"}
+                        }
+                    }
+                },
+                "/api/invoices/me": {
+                    "get": {
+                        "summary": "Listar facturas del usuario autenticado",
+                        "security": [{"BearerAuth": []}],
+                        "responses": {
+                            "200": {"description": "Listado de facturas"},
+                            "401": {"description": "No autenticado"}
+                        }
+                    }
+                },
+                "/api/invoices/person/{partner_id}": {
+                    "get": {
+                        "summary": "Listar facturas de un contacto",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "partner_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Listado de facturas"},
+                            "403": {"description": "No autorizado"},
+                            "404": {"description": "Contacto no encontrado"}
+                        }
+                    }
+                },
                 "/api/tickets": {
                     "post": {
                         "summary": "Crear ticket de soporte",

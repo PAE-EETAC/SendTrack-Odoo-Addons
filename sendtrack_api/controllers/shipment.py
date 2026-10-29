@@ -83,7 +83,8 @@ class ShipmentApiController(http.Controller):
                     'price_unit': price_unit,
                 })],
             })
-            order.action_confirm()
+            if payload.get('confirm_sale', True):
+                order.action_confirm()
             shipment.write({'sale_order_id': order.id})
 
             result = shipment.to_dict()
@@ -142,3 +143,95 @@ class ShipmentApiController(http.Controller):
             return request.make_json_response({'error': 'Shipment not found with given tracking code'}, status=404)
 
         return request.make_json_response(shipment.to_dict(), status=200)
+
+    @http.route('/api/shipments/<int:shipment_id>/sale', type='http', auth='public', methods=['GET'], csrf=False)
+    @jwt_required
+    def get_shipment_sale(self, shipment_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        if not shipment.sale_order_id:
+            return request.make_json_response({'error': 'No quotation or sale order associated with this shipment'}, status=404)
+
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to view this quotation'}, status=403)
+
+        order = shipment.sale_order_id
+        line = order.order_line[0] if order.order_line else None
+
+        result = {
+            'sale_order_id': order.id,
+            'sale_order_name': order.name,
+            'state': order.state,
+            'partner_id': order.partner_id.id,
+            'partner_name': order.partner_id.name,
+            'amount_untaxed': order.amount_untaxed,
+            'amount_tax': order.amount_tax,
+            'amount_total': order.amount_total,
+            'shipment_id': shipment.id,
+            'shipment_name': shipment.name,
+            'shipment_tracking_code': shipment.tracking_code,
+            'product_id': line.product_id.id if line else None,
+            'product_name': line.product_id.name if line else '',
+            'quantity': line.product_uom_qty if line else 0.0,
+            'price_unit': line.price_unit if line else 0.0,
+            'date_order': str(order.date_order) if order.date_order else ''
+        }
+        return request.make_json_response(result, status=200)
+
+    @http.route('/api/shipments/<int:shipment_id>/sale/confirm', type='http', auth='public', methods=['POST'], csrf=False)
+    @jwt_required
+    def confirm_shipment_sale(self, shipment_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        if not shipment.sale_order_id:
+            return request.make_json_response({'error': 'No quotation or sale order associated with this shipment'}, status=404)
+
+        order = shipment.sale_order_id
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id and order.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to confirm this quotation'}, status=403)
+
+        if order.state in ['sale', 'done']:
+            return request.make_json_response({
+                'message': 'Quotation is already confirmed',
+                'sale_order_id': order.id,
+                'sale_order_name': order.name,
+                'state': order.state,
+                'amount_total': order.amount_total
+            }, status=200)
+
+        if order.state == 'cancel':
+            return request.make_json_response({'error': 'Cancelled quotation cannot be confirmed'}, status=400)
+
+        try:
+            order.action_confirm()
+            return request.make_json_response({
+                'message': 'Quotation confirmed successfully',
+                'sale_order_id': order.id,
+                'sale_order_name': order.name,
+                'state': order.state,
+                'partner_id': order.partner_id.id,
+                'partner_name': order.partner_id.name,
+                'amount_total': order.amount_total
+            }, status=200)
+        except Exception as e:
+            return request.make_json_response({'error': str(e)}, status=500)
