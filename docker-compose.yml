@@ -12,7 +12,7 @@ services:
     volumes:
       - odoo-web-data:/var/lib/odoo
       - ./sendtrack_api:/mnt/extra-addons/sendtrack_api
-      - ../Logistics-Companies-Addon:/mnt/extra-addons/logistics_companies
+      - ./logistics_companies:/mnt/extra-addons/logistics_companies
     command: -- -d odoo -i contacts,sale_management,sendtrack_api,logistics_companies --dev=reload,xml
 
   db:
