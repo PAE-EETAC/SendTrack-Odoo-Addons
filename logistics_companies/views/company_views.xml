@@ -4,7 +4,7 @@
         <field name="name">Compañías</field>
         <field name="res_model">res.partner</field>
         <field name="view_mode">kanban,list,form</field>
-        <field name="domain">['|', ('category_id.name', '=ilike', 'Operador Logístico'), ('category_id.name', '=ilike', 'Operador Logistico')]</field>
+        <field name="domain">['|', ('category_id.name', 'ilike', 'Operador Log'), ('category_id.name', 'ilike', 'Logist')]</field>
         <field name="context">{'default_is_company': True}</field>
         <field name="search_view_id" ref="base.view_res_partner_filter"/>
         <field name="help" type="html">
