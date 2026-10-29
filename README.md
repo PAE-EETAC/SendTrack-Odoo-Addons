@@ -1,29 +1,52 @@
-# API Odoo (SendTrack)
+# SendTrack - Odoo Addons
 
+Módulos personalizados de Odoo 19 para la plataforma SendTrack:
+
+- **`sendtrack_api`**: API REST para autenticación (JWT), envíos con creación automática de orden de venta en Sales y tickets de soporte.
+- **`logistics_companies`**: Catálogo en Odoo que muestra en una vista propia las empresas que tengan la etiqueta `Operador Logístico`.
+
+---
 
 ## Swagger UI
-Swagger:
-`http://localhost:8069/api/docs`
 
+Documentación interactiva disponible en:
+- Interfaz: `http://localhost:8069/api/docs`
+- Especificación OpenAPI: `http://localhost:8069/api/openapi.json`
 
-## Arranque
+---
 
-Levantar contenedores:
+## Arranque en local
 
+1. Levantar contenedores:
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Credenciales admin en `http://localhost:8069`:
-- User: `admin`
-- Password: `admin`
+2. Acceder a Odoo en `http://localhost:8069`:
+- Usuario: `admin`
+- Contraseña: `admin`
 
+---
+
+## Estructura
+
+```text
+├── sendtrack_api/          # Módulo API REST
+├── logistics_companies/    # Módulo catálogo Compañías
+├── docker-compose.yml      # Entorno Docker local (Odoo 19 + Postgres 15)
+├── Dockerfile              # Build con PyJWT
+└── requirements.txt        # Dependencias Python
+```
+
+---
 
 ## Endpoints
 
+Todos los endpoints que devuelven datos retornan JSON plano (sin objetos anidados).
+
 ### Auth
 
-#### Register
+#### Registro
 `POST /api/auth/register`
 
 Body:
@@ -37,7 +60,7 @@ Body:
 }
 ```
 
-Respuesta:
+Respuesta (201):
 ```json
 {
   "user_id": 7,
@@ -60,7 +83,7 @@ Body:
 }
 ```
 
-Respuesta:
+Respuesta (200):
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -76,9 +99,7 @@ Respuesta:
 #### Logout
 `POST /api/auth/logout`
 
-Body: `{}`
-
-Respuesta:
+Respuesta (200):
 ```json
 {
   "status": "logged_out"
@@ -89,26 +110,29 @@ Respuesta:
 
 ### Envíos
 
-#### Crear envío (para el usuario autenticado)
+#### Crear envío
 `POST /api/shipments`
 
 Headers:
-`Authorization: Bearer <token>`
+```http
+Authorization: Bearer <token>
+```
 
 Body:
 ```json
 {
+  "sender_id": 1,
+  "receiver_id": 9,
+  "delivery_address": "Av Diagonal 100, Barcelona",
+  "weight": 1.5,
   "product_id": 1,
   "price_unit": 25.50,
   "quantity": 1.0,
-  "delivery_address": "Av Diagonal 100",
-  "notes": "Piso 2",
-  "weight": 1.5
+  "notes": "Dejar en portería"
 }
 ```
-*(Nota: El destinatario es automáticamente el usuario del token. Si no se envía `delivery_address`, se utiliza la dirección de su perfil).*
 
-Respuesta:
+Respuesta (201):
 ```json
 {
   "id": 1,
@@ -116,83 +140,64 @@ Respuesta:
   "tracking_code": "E5F6G7H8I9J0",
   "sender_id": 1,
   "sender_name": "My Company",
-  "receiver_id": 69,
-  "receiver_name": "Usuario Test",
-  "receiver_email": "test_user@sendtrack.com",
-  "receiver_phone": "+34 600 111 222",
-  "delivery_address": "Av Diagonal 100",
+  "receiver_id": 9,
+  "receiver_name": "Pepe",
+  "receiver_email": "pepe@test.com",
+  "receiver_phone": "600123456",
+  "delivery_address": "Av Diagonal 100, Barcelona",
   "weight": 1.5,
   "status": "draft",
-  "notes": "Piso 2",
+  "notes": "Dejar en portería",
   "sale_order_id": 2,
   "sale_order_name": "S00002",
   "sale_state": "sale",
-  "amount_total": 25.50,
+  "amount_total": 30.85,
   "product_id": 1,
-  "product_name": "Servicio de Envío Estándar",
+  "product_name": "Servicio de Envío",
   "quantity": 1.0,
   "price_unit": 25.50,
   "created_at": "2026-10-23 07:50:00"
 }
 ```
 
-#### Listar mis envíos (usuario autenticado)
+#### Mis envíos
 `GET /api/shipments/me`
 
 Headers:
-`Authorization: Bearer <token>`
-
-#### Listar envíos de una persona
-`GET /api/shipments/person/<partner_id>`
-
-Filtro opcional con query param: `?role=sender` o `?role=receiver`
-
-Respuesta:
-```json
-[
-  {
-    "id": 1,
-    "name": "SHP-A1B2C3D4",
-    "tracking_code": "E5F6G7H8I9J0",
-    "sender_id": 3,
-    "sender_name": "Pepe",
-    "sender_email": "pepe@test.com",
-    "sender_phone": "600123456",
-    "receiver_id": 4,
-    "receiver_name": "Ana Lopez",
-    "receiver_email": "ana@test.com",
-    "receiver_phone": "611223344",
-    "delivery_address": "Av Diagonal 100",
-    "weight": 1.5,
-    "status": "draft",
-    "notes": "Piso 2",
-    "created_at": "2026-10-12 18:00:00"
-  }
-]
+```http
+Authorization: Bearer <token>
 ```
 
-#### Tracking de un envío
+#### Envíos por persona
+`GET /api/shipments/person/<partner_id>`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Query param opcional: `?role=sender` o `?role=receiver`
+
+#### Tracking de envío
 `GET /api/shipments/track/<tracking_code>`
 
-Respuesta:
+Respuesta (200):
 ```json
 {
   "id": 1,
   "name": "SHP-A1B2C3D4",
   "tracking_code": "E5F6G7H8I9J0",
-  "sender_id": 3,
-  "sender_name": "Pepe",
-  "sender_email": "pepe@test.com",
-  "sender_phone": "600123456",
-  "receiver_id": 4,
-  "receiver_name": "Ana Lopez",
-  "receiver_email": "ana@test.com",
-  "receiver_phone": "611223344",
-  "delivery_address": "Av Diagonal 100",
+  "sender_id": 1,
+  "sender_name": "My Company",
+  "receiver_id": 9,
+  "receiver_name": "Pepe",
+  "receiver_email": "pepe@test.com",
+  "receiver_phone": "600123456",
+  "delivery_address": "Av Diagonal 100, Barcelona",
   "weight": 1.5,
   "status": "draft",
-  "notes": "Piso 2",
-  "created_at": "2026-10-12 18:00:00"
+  "notes": "Dejar en portería",
+  "created_at": "2026-10-23 07:50:00"
 }
 ```
 
@@ -203,25 +208,30 @@ Respuesta:
 #### Crear ticket
 `POST /api/tickets`
 
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
 Body:
 ```json
 {
-  "title": "Paquete golpeado",
-  "description": "Ha llegado la caja rota",
-  "partner_id": 3,
+  "title": "Paquete dañado",
+  "description": "La caja ha llegado rota",
+  "partner_id": 9,
   "tracking_code": "E5F6G7H8I9J0",
   "priority": "high"
 }
 ```
 
-Respuesta:
+Respuesta (201):
 ```json
 {
   "id": 1,
   "name": "TCK-9A8B7C6D",
-  "title": "Paquete golpeado",
-  "description": "Ha llegado la caja rota",
-  "partner_id": 3,
+  "title": "Paquete dañado",
+  "description": "La caja ha llegado rota",
+  "partner_id": 9,
   "partner_name": "Pepe",
   "partner_email": "pepe@test.com",
   "shipment_id": 1,
@@ -235,22 +245,7 @@ Respuesta:
 #### Listar tickets de una persona
 `GET /api/tickets/person/<partner_id>`
 
-Respuesta:
-```json
-[
-  {
-    "id": 1,
-    "name": "TCK-9A8B7C6D",
-    "title": "Paquete golpeado",
-    "description": "Ha llegado la caja rota",
-    "partner_id": 3,
-    "partner_name": "Pepe",
-    "partner_email": "pepe@test.com",
-    "shipment_id": 1,
-    "shipment_tracking_code": "E5F6G7H8I9J0",
-    "priority": "high",
-    "status": "open",
-    "created_at": "2026-10-12 18:05:00"
-  }
-]
+Headers:
+```http
+Authorization: Bearer <token>
 ```
