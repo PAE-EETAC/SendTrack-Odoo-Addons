@@ -252,9 +252,81 @@ Respuesta (200):
 }
 ```
 
+#### Generar factura borrador desde un envío (Fase 3)
+`POST /api/shipments/<shipment_id>/invoice`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Respuesta (201):
+```json
+{
+  "message": "Draft invoice created successfully",
+  "invoice_id": 5,
+  "invoice_name": "Draft",
+  "state": "draft",
+  "payment_state": "not_paid",
+  "invoice_date": "2026-10-30",
+  "partner_id": 9,
+  "partner_name": "Pepe",
+  "amount_untaxed": 25.50,
+  "amount_tax": 5.35,
+  "amount_total": 30.85,
+  "currency": "EUR",
+  "shipment_id": 1,
+  "sale_order_id": 2
+}
+```
+
+#### Validar y publicar factura de un envío (Fase 4)
+`POST /api/shipments/<shipment_id>/invoice/post`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Respuesta (200):
+```json
+{
+  "message": "Invoice posted successfully",
+  "invoice_id": 5,
+  "invoice_name": "INV/2026/00001",
+  "state": "posted",
+  "payment_state": "not_paid",
+  "invoice_date": "2026-10-30",
+  "partner_id": 9,
+  "partner_name": "Pepe",
+  "amount_untaxed": 25.50,
+  "amount_tax": 5.35,
+  "amount_total": 30.85,
+  "currency": "EUR",
+  "shipment_id": 1,
+  "sale_order_id": 2
+}
+```
+
+#### Consultar factura de un envío
+`GET /api/shipments/<shipment_id>/invoice`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
 ---
 
 ### Facturas
+
+#### Validar y publicar factura por ID (Fase 4)
+`POST /api/invoices/<invoice_id>/post`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
 
 #### Listar mis facturas
 `GET /api/invoices/me`

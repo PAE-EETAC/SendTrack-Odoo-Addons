@@ -235,3 +235,168 @@ class ShipmentApiController(http.Controller):
             }, status=200)
         except Exception as e:
             return request.make_json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/shipments/<int:shipment_id>/invoice', type='http', auth='public', methods=['POST'], csrf=False)
+    @jwt_required
+    def create_shipment_invoice(self, shipment_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        if not shipment.sale_order_id:
+            return request.make_json_response({'error': 'No quotation or sale order associated with this shipment'}, status=404)
+
+        order = shipment.sale_order_id
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id and order.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to invoice this shipment'}, status=403)
+
+        if order.state == 'draft':
+            return request.make_json_response({'error': 'Quotation must be confirmed before creating an invoice. Please confirm it first.'}, status=400)
+
+        if order.state == 'cancel':
+            return request.make_json_response({'error': 'Cannot create invoice for a cancelled order'}, status=400)
+
+        existing_invoices = order.invoice_ids.filtered(lambda inv: inv.state != 'cancel')
+        if existing_invoices:
+            inv = existing_invoices[0]
+            return request.make_json_response({
+                'error': 'An invoice already exists for this shipment',
+                'invoice_id': inv.id,
+                'invoice_name': inv.name if (inv.name and inv.name != '/') else 'Draft',
+                'state': inv.state,
+                'amount_total': inv.amount_total
+            }, status=409)
+
+        try:
+            invoices = order.sudo()._create_invoices()
+            if not invoices:
+                return request.make_json_response({'error': 'No invoice lines could be generated for this order'}, status=400)
+
+            inv = invoices[0]
+            return request.make_json_response({
+                'message': 'Draft invoice created successfully',
+                'invoice_id': inv.id,
+                'invoice_name': inv.name if (inv.name and inv.name != '/') else 'Draft',
+                'state': inv.state,
+                'payment_state': inv.payment_state or 'not_paid',
+                'invoice_date': str(inv.invoice_date) if inv.invoice_date else '',
+                'partner_id': inv.partner_id.id,
+                'partner_name': inv.partner_id.name,
+                'amount_untaxed': inv.amount_untaxed,
+                'amount_tax': inv.amount_tax,
+                'amount_total': inv.amount_total,
+                'currency': inv.currency_id.name if inv.currency_id else '',
+                'shipment_id': shipment.id,
+                'sale_order_id': order.id
+            }, status=201)
+        except Exception as e:
+            return request.make_json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/shipments/<int:shipment_id>/invoice/post', type='http', auth='public', methods=['POST'], csrf=False)
+    @jwt_required
+    def post_shipment_invoice(self, shipment_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        if not shipment.sale_order_id:
+            return request.make_json_response({'error': 'No quotation or sale order associated with this shipment'}, status=404)
+
+        order = shipment.sale_order_id
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id and order.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to post this invoice'}, status=403)
+
+        draft_invoices = order.invoice_ids.filtered(lambda inv: inv.state == 'draft')
+        if not draft_invoices:
+            posted_invoices = order.invoice_ids.filtered(lambda inv: inv.state == 'posted')
+            if posted_invoices:
+                inv = posted_invoices[0]
+                return request.make_json_response({
+                    'message': 'Invoice is already posted',
+                    'invoice_id': inv.id,
+                    'invoice_name': inv.name,
+                    'state': inv.state,
+                    'amount_total': inv.amount_total
+                }, status=200)
+            return request.make_json_response({'error': 'No draft invoice found for this shipment. Please generate the invoice first.'}, status=404)
+
+        inv = draft_invoices[0]
+        try:
+            inv.action_post()
+            return request.make_json_response({
+                'message': 'Invoice posted successfully',
+                'invoice_id': inv.id,
+                'invoice_name': inv.name,
+                'state': inv.state,
+                'payment_state': inv.payment_state or 'not_paid',
+                'invoice_date': str(inv.invoice_date) if inv.invoice_date else '',
+                'partner_id': inv.partner_id.id,
+                'partner_name': inv.partner_id.name,
+                'amount_untaxed': inv.amount_untaxed,
+                'amount_tax': inv.amount_tax,
+                'amount_total': inv.amount_total,
+                'currency': inv.currency_id.name if inv.currency_id else '',
+                'shipment_id': shipment.id,
+                'sale_order_id': order.id
+            }, status=200)
+        except Exception as e:
+            return request.make_json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/shipments/<int:shipment_id>/invoice', type='http', auth='public', methods=['GET'], csrf=False)
+    @jwt_required
+    def get_shipment_invoice(self, shipment_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        if not shipment.sale_order_id:
+            return request.make_json_response({'error': 'No quotation or sale order associated with this shipment'}, status=404)
+
+        order = shipment.sale_order_id
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id and order.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to view this invoice'}, status=403)
+
+        invoices = order.invoice_ids.filtered(lambda inv: inv.state != 'cancel')
+        if not invoices:
+            return request.make_json_response({'error': 'No invoice found for this shipment'}, status=404)
+
+        inv = invoices[0]
+        return request.make_json_response({
+            'invoice_id': inv.id,
+            'invoice_name': inv.name if (inv.name and inv.name != '/') else 'Draft',
+            'state': inv.state,
+            'payment_state': inv.payment_state or 'not_paid',
+            'invoice_date': str(inv.invoice_date) if inv.invoice_date else '',
+            'partner_id': inv.partner_id.id,
+            'partner_name': inv.partner_id.name,
+            'amount_untaxed': inv.amount_untaxed,
+            'amount_tax': inv.amount_tax,
+            'amount_total': inv.amount_total,
+            'currency': inv.currency_id.name if inv.currency_id else '',
+            'shipment_id': shipment.id,
+            'sale_order_id': order.id
+        }, status=200)

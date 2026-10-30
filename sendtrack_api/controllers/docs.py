@@ -200,6 +200,79 @@ class DocsApiController(http.Controller):
                         }
                     }
                 },
+                "/api/shipments/{shipment_id}/invoice": {
+                    "get": {
+                        "summary": "Consultar factura asociada a un envio",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Detalles de la factura"},
+                            "403": {"description": "No autorizado"},
+                            "404": {"description": "Envio o factura no encontrada"}
+                        }
+                    },
+                    "post": {
+                        "summary": "Generar factura borrador desde la venta del envio (Paso 3)",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "201": {"description": "Factura borrador creada exitosamente"},
+                            "400": {"description": "El pedido debe estar confirmado primero"},
+                            "409": {"description": "Ya existe una factura para este envio"}
+                        }
+                    }
+                },
+                "/api/shipments/{shipment_id}/invoice/post": {
+                    "post": {
+                        "summary": "Validar y publicar factura de un envio (Paso 4)",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Factura validada y publicada con numero oficial"},
+                            "404": {"description": "Factura borrador no encontrada"}
+                        }
+                    }
+                },
+                "/api/invoices/{invoice_id}/post": {
+                    "post": {
+                        "summary": "Validar y publicar una factura por su ID (Paso 4)",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "invoice_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Factura validada y publicada"},
+                            "403": {"description": "No autorizado"},
+                            "404": {"description": "Factura no encontrada"}
+                        }
+                    }
+                },
                 "/api/invoices/me": {
                     "get": {
                         "summary": "Listar facturas del usuario autenticado",
