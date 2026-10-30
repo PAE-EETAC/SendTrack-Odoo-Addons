@@ -106,6 +106,35 @@ Respuesta (200):
 }
 ```
 
+#### Actualizar perfil
+`PUT /api/auth/me`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Body:
+```json
+{
+  "name": "Pepe Garcia",
+  "phone": "600987654",
+  "street": "Avinguda Diagonal 200"
+}
+```
+
+Respuesta (200):
+```json
+{
+  "user_id": 7,
+  "partner_id": 9,
+  "name": "Pepe Garcia",
+  "email": "pepe@test.com",
+  "phone": "600987654",
+  "street": "Avinguda Diagonal 200"
+}
+```
+
 ---
 
 ### Envíos
@@ -198,6 +227,36 @@ Respuesta (200):
   "status": "draft",
   "notes": "Dejar en portería",
   "created_at": "2026-10-23 07:50:00"
+}
+```
+
+#### Actualizar envío en borrador
+`PUT /api/shipments/<shipment_id>`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Body:
+```json
+{
+  "delivery_address": "Carrer Nou 45, Barcelona",
+  "notes": "Dejar con el conserje",
+  "weight": 2.0
+}
+```
+
+Respuesta (200):
+```json
+{
+  "id": 1,
+  "name": "SHP-A1B2C3D4",
+  "tracking_code": "E5F6G7H8I9J0",
+  "delivery_address": "Carrer Nou 45, Barcelona",
+  "weight": 2.0,
+  "status": "draft",
+  "notes": "Dejar con el conserje"
 }
 ```
 
@@ -413,4 +472,40 @@ Respuesta (201):
 Headers:
 ```http
 Authorization: Bearer <token>
+```
+
+#### Actualizar ticket
+`PUT /api/tickets/<ticket_id>`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+
+Body:
+```json
+{
+  "title": "Paquete dañado - Actualización",
+  "description": "El paquete presenta rotura en la esquina superior",
+  "priority": "medium",
+  "status": "in_progress"
+}
+```
+
+Respuesta (200):
+```json
+{
+  "id": 1,
+  "name": "TCK-9A8B7C6D",
+  "title": "Paquete dañado - Actualización",
+  "description": "El paquete presenta rotura en la esquina superior",
+  "partner_id": 9,
+  "partner_name": "Pepe",
+  "partner_email": "pepe@test.com",
+  "shipment_id": 1,
+  "shipment_tracking_code": "E5F6G7H8I9J0",
+  "priority": "medium",
+  "status": "in_progress",
+  "created_at": "2026-10-12 18:05:00"
+}
 ```

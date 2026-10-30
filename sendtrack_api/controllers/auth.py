@@ -2,7 +2,7 @@ import json
 from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessDenied
-from .jwt_auth import generate_token
+from .jwt_auth import generate_token, jwt_required, validate_token
 
 class AuthApiController(http.Controller):
 
@@ -49,6 +49,52 @@ class AuthApiController(http.Controller):
     @http.route('/api/auth/logout', type='http', auth='public', methods=['POST'], csrf=False)
     def logout(self, **kwargs):
         return request.make_json_response({'status': 'logged_out'}, status=200)
+
+    @http.route('/api/auth/me', type='http', auth='public', methods=['PUT'], csrf=False)
+    @jwt_required
+    def update_profile(self, **kwargs):
+        try:
+            payload = json.loads(request.httprequest.data.decode('utf-8'))
+        except Exception:
+            payload = kwargs
+
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_id = int(token_data.get('user_id'))
+        partner_id = int(token_data.get('partner_id'))
+
+        user = request.env['res.users'].sudo().browse(user_id)
+        if not user.exists():
+            return request.make_json_response({'error': 'User not found'}, status=404)
+
+        partner = user.partner_id
+        vals_user = {}
+        vals_partner = {}
+
+        if 'name' in payload and payload['name']:
+            vals_user['name'] = payload['name']
+            vals_partner['name'] = payload['name']
+        if 'phone' in payload:
+            vals_partner['phone'] = payload['phone']
+        if 'street' in payload:
+            vals_partner['street'] = payload['street']
+
+        try:
+            if vals_user:
+                user.write(vals_user)
+            if vals_partner:
+                partner.write(vals_partner)
+
+            return request.make_json_response({
+                'user_id': user.id,
+                'partner_id': partner.id,
+                'name': user.name,
+                'email': user.email or '',
+                'phone': partner.phone or '',
+                'street': partner.street or ''
+            }, status=200)
+        except Exception as e:
+            return request.make_json_response({'error': str(e)}, status=500)
 
     @http.route('/api/auth/register', type='http', auth='public', methods=['POST'], csrf=False)
     def register(self, **kwargs):

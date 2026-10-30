@@ -10,14 +10,22 @@ class DocsApiController(http.Controller):
             "info": {
                 "title": "SendTrack Odoo REST API",
                 "version": "1.0.0",
-                "description": "API REST para gestion de autenticacion, contactos, envios y tickets en Odoo"
+                "description": "API REST para gestion de autenticacion, contactos, envios, ventas, facturacion y tickets en Odoo"
             },
             "servers": [
                 {"url": "/", "description": "Server"}
             ],
+            "tags": [
+                {"name": "Autenticación", "description": "Registro, inicio de sesión y gestión de perfil de usuario"},
+                {"name": "Envíos", "description": "Gestión de paquetes, seguimiento y actualización de envíos"},
+                {"name": "Presupuestos y Ventas", "description": "Consulta y confirmación de presupuestos comerciales asociados a envíos"},
+                {"name": "Facturas", "description": "Generación, validación y consulta de facturas de clientes"},
+                {"name": "Tickets de Soporte", "description": "Gestión de incidencias y soporte técnico"}
+            ],
             "paths": {
                 "/api/auth/register": {
                     "post": {
+                        "tags": ["Autenticación"],
                         "summary": "Registrar nuevo usuario y contacto",
                         "requestBody": {
                             "required": True,
@@ -46,6 +54,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/auth/login": {
                     "post": {
+                        "tags": ["Autenticación"],
                         "summary": "Iniciar sesion",
                         "requestBody": {
                             "required": True,
@@ -70,14 +79,42 @@ class DocsApiController(http.Controller):
                 },
                 "/api/auth/logout": {
                     "post": {
+                        "tags": ["Autenticación"],
                         "summary": "Cerrar sesion",
                         "responses": {
                             "200": {"description": "Sesion cerrada"}
                         }
                     }
                 },
+                "/api/auth/me": {
+                    "put": {
+                        "tags": ["Autenticación"],
+                        "summary": "Actualizar perfil del usuario autenticado",
+                        "security": [{"BearerAuth": []}],
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string", "example": "Carlos Gomez"},
+                                            "phone": {"type": "string", "example": "611223344"},
+                                            "street": {"type": "string", "example": "Avinguda Diagonal 100"}
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {
+                            "200": {"description": "Perfil actualizado exitosamente"},
+                            "401": {"description": "No autorizado"}
+                        }
+                    }
+                },
                 "/api/shipments": {
                     "post": {
+                        "tags": ["Envíos"],
                         "summary": "Crear envio para el usuario autenticado",
                         "security": [{"BearerAuth": []}],
                         "requestBody": {
@@ -94,7 +131,8 @@ class DocsApiController(http.Controller):
                                             "delivery_address": {"type": "string", "example": "Avenida Diagonal 200, Barcelona"},
                                             "sender_id": {"type": "integer", "example": 68},
                                             "weight": {"type": "number", "example": 2.5},
-                                            "notes": {"type": "string", "example": "Timbre 2B"}
+                                            "notes": {"type": "string", "example": "Timbre 2B"},
+                                            "confirm_sale": {"type": "boolean", "example": True, "description": "Confirmar la venta inmediatamente (true) o dejar en presupuesto borrador (false)"}
                                         }
                                     }
                                 }
@@ -106,8 +144,45 @@ class DocsApiController(http.Controller):
                         }
                     }
                 },
+                "/api/shipments/{shipment_id}": {
+                    "put": {
+                        "tags": ["Envíos"],
+                        "summary": "Actualizar envio en borrador",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "delivery_address": {"type": "string", "example": "Carrer Nou 45, Barcelona"},
+                                            "notes": {"type": "string", "example": "Dejar con el conserje"},
+                                            "weight": {"type": "number", "example": 3.0}
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {
+                            "200": {"description": "Envio actualizado exitosamente"},
+                            "400": {"description": "El envio solo se puede modificar en estado borrador"},
+                            "403": {"description": "No autorizado para modificar este envio"},
+                            "404": {"description": "Envio no encontrado"}
+                        }
+                    }
+                },
                 "/api/shipments/me": {
                     "get": {
+                        "tags": ["Envíos"],
                         "summary": "Listar mis envios (usuario autenticado)",
                         "security": [{"BearerAuth": []}],
                         "responses": {
@@ -117,6 +192,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/person/{partner_id}": {
                     "get": {
+                        "tags": ["Envíos"],
                         "summary": "Listar envios de una persona",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -145,6 +221,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/track/{tracking_code}": {
                     "get": {
+                        "tags": ["Envíos"],
                         "summary": "Rastrear envio por tracking code",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -163,6 +240,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/{shipment_id}/sale": {
                     "get": {
+                        "tags": ["Presupuestos y Ventas"],
                         "summary": "Consultar presupuesto o venta asociada a un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -182,6 +260,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/{shipment_id}/sale/confirm": {
                     "post": {
+                        "tags": ["Presupuestos y Ventas"],
                         "summary": "Confirmar presupuesto asociado a un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -202,6 +281,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/{shipment_id}/invoice": {
                     "get": {
+                        "tags": ["Facturas"],
                         "summary": "Consultar factura asociada a un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -219,6 +299,7 @@ class DocsApiController(http.Controller):
                         }
                     },
                     "post": {
+                        "tags": ["Facturas"],
                         "summary": "Generar factura borrador desde un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -238,6 +319,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/{shipment_id}/invoice/post": {
                     "post": {
+                        "tags": ["Facturas"],
                         "summary": "Publicar factura de un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -256,6 +338,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/invoices/{invoice_id}/post": {
                     "post": {
+                        "tags": ["Facturas"],
                         "summary": "Publicar factura por ID",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -275,6 +358,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/invoices/me": {
                     "get": {
+                        "tags": ["Facturas"],
                         "summary": "Listar facturas del usuario autenticado",
                         "security": [{"BearerAuth": []}],
                         "responses": {
@@ -285,6 +369,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/invoices/person/{partner_id}": {
                     "get": {
+                        "tags": ["Facturas"],
                         "summary": "Listar facturas de un contacto",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -304,6 +389,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/tickets": {
                     "post": {
+                        "tags": ["Tickets de Soporte"],
                         "summary": "Crear ticket de soporte",
                         "security": [{"BearerAuth": []}],
                         "requestBody": {
@@ -334,8 +420,52 @@ class DocsApiController(http.Controller):
                         }
                     }
                 },
+                "/api/tickets/{ticket_id}": {
+                    "put": {
+                        "tags": ["Tickets de Soporte"],
+                        "summary": "Actualizar ticket de soporte",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "ticket_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "title": {"type": "string", "example": "Paquete danado - reclamacion"},
+                                            "description": {"type": "string", "example": "Se adjunta fotografia de la rotura"},
+                                            "priority": {
+                                                "type": "string",
+                                                "enum": ["low", "medium", "high"]
+                                            },
+                                            "status": {
+                                                "type": "string",
+                                                "enum": ["open", "in_progress", "resolved", "closed"]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {
+                            "200": {"description": "Ticket actualizado exitosamente"},
+                            "400": {"description": "Datos o estado invalidos"},
+                            "403": {"description": "No autorizado"},
+                            "404": {"description": "Ticket no encontrado"}
+                        }
+                    }
+                },
                 "/api/tickets/person/{partner_id}": {
                     "get": {
+                        "tags": ["Tickets de Soporte"],
                         "summary": "Listar tickets de una persona",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
@@ -386,6 +516,7 @@ class DocsApiController(http.Controller):
                 url: "/api/openapi.json",
                 dom_id: '#swagger-ui',
                 deepLinking: true,
+                docExpansion: 'list',
                 presets: [
                     SwaggerUIBundle.presets.apis,
                     SwaggerUIBundle.SwaggerUIStandalonePreset

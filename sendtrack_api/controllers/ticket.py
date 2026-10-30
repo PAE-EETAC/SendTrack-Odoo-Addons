@@ -1,7 +1,7 @@
 import json
 from odoo import http
 from odoo.http import request
-from .jwt_auth import jwt_required
+from .jwt_auth import jwt_required, validate_token
 
 class TicketApiController(http.Controller):
 
@@ -61,5 +61,51 @@ class TicketApiController(http.Controller):
             tickets = request.env['sendtrack.ticket'].sudo().search([('partner_id', '=', int(partner_id))])
             result = [t.to_dict() for t in tickets]
             return request.make_json_response(result, status=200)
+        except Exception as e:
+            return request.make_json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/tickets/<int:ticket_id>', type='http', auth='public', methods=['PUT'], csrf=False)
+    @jwt_required
+    def update_ticket(self, ticket_id, **kwargs):
+        try:
+            payload = json.loads(request.httprequest.data.decode('utf-8'))
+        except Exception:
+            payload = kwargs
+
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        ticket = request.env['sendtrack.ticket'].sudo().browse(ticket_id)
+        if not ticket.exists():
+            return request.make_json_response({'error': 'Ticket not found'}, status=404)
+
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and ticket.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to update this ticket'}, status=403)
+
+        vals = {}
+        if 'title' in payload and payload['title']:
+            vals['title'] = payload['title']
+        if 'description' in payload and payload['description']:
+            vals['description'] = payload['description']
+        if 'priority' in payload:
+            if payload['priority'] in ['low', 'medium', 'high']:
+                vals['priority'] = payload['priority']
+            else:
+                return request.make_json_response({'error': 'Invalid priority. Must be low, medium or high'}, status=400)
+        if 'status' in payload:
+            if payload['status'] in ['open', 'in_progress', 'resolved', 'closed']:
+                vals['status'] = payload['status']
+            else:
+                return request.make_json_response({'error': 'Invalid status. Must be open, in_progress, resolved or closed'}, status=400)
+
+        try:
+            if vals:
+                ticket.write(vals)
+            return request.make_json_response(ticket.to_dict(), status=200)
         except Exception as e:
             return request.make_json_response({'error': str(e)}, status=500)

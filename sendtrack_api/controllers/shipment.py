@@ -144,6 +144,50 @@ class ShipmentApiController(http.Controller):
 
         return request.make_json_response(shipment.to_dict(), status=200)
 
+    @http.route('/api/shipments/<int:shipment_id>', type='http', auth='public', methods=['PUT'], csrf=False)
+    @jwt_required
+    def update_shipment(self, shipment_id, **kwargs):
+        try:
+            payload = json.loads(request.httprequest.data.decode('utf-8'))
+        except Exception:
+            payload = kwargs
+
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to update this shipment'}, status=403)
+
+        if shipment.status != 'draft':
+            return request.make_json_response({'error': 'Shipment can only be updated while in draft status'}, status=400)
+
+        vals = {}
+        if 'delivery_address' in payload and payload['delivery_address']:
+            vals['delivery_address'] = payload['delivery_address']
+        if 'notes' in payload:
+            vals['notes'] = payload['notes']
+        if 'weight' in payload:
+            try:
+                vals['weight'] = float(payload['weight'])
+            except (ValueError, TypeError):
+                return request.make_json_response({'error': 'Weight must be a number'}, status=400)
+
+        try:
+            if vals:
+                shipment.write(vals)
+            return request.make_json_response(shipment.to_dict(), status=200)
+        except Exception as e:
+            return request.make_json_response({'error': str(e)}, status=500)
+
     @http.route('/api/shipments/<int:shipment_id>/sale', type='http', auth='public', methods=['GET'], csrf=False)
     @jwt_required
     def get_shipment_sale(self, shipment_id, **kwargs):
