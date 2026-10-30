@@ -252,7 +252,7 @@ Respuesta (200):
 }
 ```
 
-#### Generar factura borrador desde un envío (Fase 3)
+#### Generar factura borrador desde un envío
 `POST /api/shipments/<shipment_id>/invoice`
 
 Headers:
@@ -280,7 +280,7 @@ Respuesta (201):
 }
 ```
 
-#### Validar y publicar factura de un envío (Fase 4)
+#### Publicar factura de un envío
 `POST /api/shipments/<shipment_id>/invoice/post`
 
 Headers:
@@ -320,7 +320,7 @@ Authorization: Bearer <token>
 
 ### Facturas
 
-#### Validar y publicar factura por ID (Fase 4)
+#### Publicar factura por ID
 `POST /api/invoices/<invoice_id>/post`
 
 Headers:

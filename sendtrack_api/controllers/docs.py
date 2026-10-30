@@ -219,7 +219,7 @@ class DocsApiController(http.Controller):
                         }
                     },
                     "post": {
-                        "summary": "Generar factura borrador desde la venta del envio (Paso 3)",
+                        "summary": "Generar factura borrador desde un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
                             {
@@ -238,7 +238,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/shipments/{shipment_id}/invoice/post": {
                     "post": {
-                        "summary": "Validar y publicar factura de un envio (Paso 4)",
+                        "summary": "Publicar factura de un envio",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
                             {
@@ -256,7 +256,7 @@ class DocsApiController(http.Controller):
                 },
                 "/api/invoices/{invoice_id}/post": {
                     "post": {
-                        "summary": "Validar y publicar una factura por su ID (Paso 4)",
+                        "summary": "Publicar factura por ID",
                         "security": [{"BearerAuth": []}],
                         "parameters": [
                             {
