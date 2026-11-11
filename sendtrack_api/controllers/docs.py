@@ -336,6 +336,27 @@ class DocsApiController(http.Controller):
                         }
                     }
                 },
+                "/api/shipments/{shipment_id}/invoice/pdf": {
+                    "get": {
+                        "tags": ["Facturas"],
+                        "summary": "Descargar factura oficial en PDF asociada a un envio",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "shipment_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Archivo PDF de la factura (application/pdf)"},
+                            "403": {"description": "No autorizado"},
+                            "404": {"description": "Envio o factura no encontrada"},
+                            "500": {"description": "Error al renderizar el reporte PDF"}
+                        }
+                    }
+                },
                 "/api/invoices/{invoice_id}/post": {
                     "post": {
                         "tags": ["Facturas"],
@@ -353,6 +374,27 @@ class DocsApiController(http.Controller):
                             "200": {"description": "Factura validada y publicada"},
                             "403": {"description": "No autorizado"},
                             "404": {"description": "Factura no encontrada"}
+                        }
+                    }
+                },
+                "/api/invoices/{invoice_id}/pdf": {
+                    "get": {
+                        "tags": ["Facturas"],
+                        "summary": "Descargar archivo PDF oficial de una factura",
+                        "security": [{"BearerAuth": []}],
+                        "parameters": [
+                            {
+                                "name": "invoice_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"}
+                            }
+                        ],
+                        "responses": {
+                            "200": {"description": "Archivo PDF de la factura (application/pdf)"},
+                            "403": {"description": "No autorizado"},
+                            "404": {"description": "Factura no encontrada"},
+                            "500": {"description": "Error al renderizar el reporte PDF"}
                         }
                     }
                 },

@@ -114,3 +114,46 @@ class InvoiceApiController(http.Controller):
             }, status=200)
         except Exception as e:
             return request.make_json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/invoices/<int:invoice_id>/pdf', type='http', auth='public', methods=['GET'], csrf=False)
+    @jwt_required
+    def download_invoice_pdf(self, invoice_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        inv = request.env['account.move'].sudo().browse(invoice_id)
+        if not inv.exists() or inv.move_type not in ['out_invoice', 'out_refund']:
+            return request.make_json_response({'error': 'Invoice not found'}, status=404)
+
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and inv.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to download this invoice'}, status=403)
+
+        pdf_bytes = None
+        try:
+            pdf_bytes, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                'account.report_invoice_with_payments', [inv.id]
+            )
+        except Exception:
+            try:
+                pdf_bytes, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                    'account.report_invoice', [inv.id]
+                )
+            except Exception:
+                pdf_bytes = None
+
+        if not pdf_bytes:
+            return request.make_json_response({'error': 'Could not render invoice PDF from Odoo'}, status=500)
+
+        clean_name = (inv.name or f'inv_{inv.id}').replace('/', '_')
+        return request.make_response(
+            pdf_bytes,
+            headers=[
+                ('Content-Type', 'application/pdf'),
+                ('Content-Disposition', f'attachment; filename="factura_{clean_name}.pdf"'),
+            ]
+        )

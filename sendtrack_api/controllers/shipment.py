@@ -1,4 +1,5 @@
 import json
+import base64
 from odoo import http
 from odoo.http import request
 from .jwt_auth import jwt_required, validate_token
@@ -105,9 +106,13 @@ class ShipmentApiController(http.Controller):
     def get_my_shipments(self, **kwargs):
         token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
         token_data = validate_token(token)
-        partner_id = token_data.get('partner_id')
+        partner_id = int(token_data.get('partner_id'))
+        status = kwargs.get('status')
         try:
-            shipments = request.env['sendtrack.shipment'].sudo().search([('receiver_id', '=', int(partner_id))])
+            domain = ['|', ('receiver_id', '=', partner_id), ('sender_id', '=', partner_id)]
+            if status:
+                domain.append(('status', '=', status))
+            shipments = request.env['sendtrack.shipment'].sudo().search(domain, order='create_date desc')
             result = [s.to_dict() for s in shipments]
             return request.make_json_response(result, status=200)
         except Exception as e:
@@ -429,6 +434,24 @@ class ShipmentApiController(http.Controller):
             return request.make_json_response({'error': 'No invoice found for this shipment'}, status=404)
 
         inv = invoices[0]
+
+        pdf_base64 = None
+        try:
+            pdf_bytes, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                'account.report_invoice_with_payments', [inv.id]
+            )
+            if pdf_bytes:
+                pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        except Exception:
+            try:
+                pdf_bytes, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                    'account.report_invoice', [inv.id]
+                )
+                if pdf_bytes:
+                    pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+            except Exception:
+                pdf_base64 = None
+
         return request.make_json_response({
             'invoice_id': inv.id,
             'invoice_name': inv.name if (inv.name and inv.name != '/') else 'Draft',
@@ -442,5 +465,58 @@ class ShipmentApiController(http.Controller):
             'amount_total': inv.amount_total,
             'currency': inv.currency_id.name if inv.currency_id else '',
             'shipment_id': shipment.id,
-            'sale_order_id': order.id
+            'sale_order_id': order.id,
+            'pdf_base64': pdf_base64
         }, status=200)
+
+    @http.route('/api/shipments/<int:shipment_id>/invoice/pdf', type='http', auth='public', methods=['GET'], csrf=False)
+    @jwt_required
+    def download_shipment_invoice_pdf(self, shipment_id, **kwargs):
+        token = request.httprequest.headers.get('Authorization').split(' ', 1)[1]
+        token_data = validate_token(token)
+        user_partner_id = int(token_data.get('partner_id'))
+        user_id = int(token_data.get('user_id'))
+
+        shipment = request.env['sendtrack.shipment'].sudo().browse(shipment_id)
+        if not shipment.exists():
+            return request.make_json_response({'error': 'Shipment not found'}, status=404)
+
+        if not shipment.sale_order_id:
+            return request.make_json_response({'error': 'No quotation or sale order associated with this shipment'}, status=404)
+
+        order = shipment.sale_order_id
+        user = request.env['res.users'].sudo().browse(user_id)
+        is_admin = user.has_group('base.group_system')
+
+        if not is_admin and shipment.sender_id.id != user_partner_id and shipment.receiver_id.id != user_partner_id and order.partner_id.id != user_partner_id:
+            return request.make_json_response({'error': 'Forbidden: You are not authorized to view this invoice'}, status=403)
+
+        invoices = order.invoice_ids.filtered(lambda inv: inv.state != 'cancel')
+        if not invoices:
+            return request.make_json_response({'error': 'No invoice found for this shipment'}, status=404)
+
+        inv = invoices[0]
+        pdf_bytes = None
+        try:
+            pdf_bytes, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                'account.report_invoice_with_payments', [inv.id]
+            )
+        except Exception:
+            try:
+                pdf_bytes, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
+                    'account.report_invoice', [inv.id]
+                )
+            except Exception:
+                pdf_bytes = None
+
+        if not pdf_bytes:
+            return request.make_json_response({'error': 'Could not render invoice PDF from Odoo'}, status=500)
+
+        clean_name = (inv.name or f'inv_{inv.id}').replace('/', '_')
+        return request.make_response(
+            pdf_bytes,
+            headers=[
+                ('Content-Type', 'application/pdf'),
+                ('Content-Disposition', f'attachment; filename="factura_{clean_name}.pdf"'),
+            ]
+        )

@@ -374,10 +374,29 @@ Headers:
 ```http
 Authorization: Bearer <token>
 ```
+Retorna los datos de la factura e incluye el campo `pdf_base64` con el contenido codificado en Base64.
+
+#### Descargar archivo PDF de la factura de un envío
+`GET /api/shipments/<shipment_id>/invoice/pdf`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+Respuesta: `200 OK` (`application/pdf`) con el archivo PDF oficial generado por Odoo.
 
 ---
 
 ### Facturas
+
+#### Descargar archivo PDF de una factura por ID
+`GET /api/invoices/<invoice_id>/pdf`
+
+Headers:
+```http
+Authorization: Bearer <token>
+```
+Respuesta: `200 OK` (`application/pdf`) con el archivo PDF oficial generado por Odoo.
 
 #### Publicar factura por ID
 `POST /api/invoices/<invoice_id>/post`
